@@ -1,11 +1,9 @@
 import re
 import pandas as pd
-
 import numpy as np
 from transformers import AutoTokenizer
 
 device = "cpu"
-
 
 def extract_bos_eos_punct_flags_from_ud(ud_file: str) -> pd.DataFrame:
     token_rows = []
@@ -33,6 +31,7 @@ def extract_bos_eos_punct_flags_from_ud(ud_file: str) -> pd.DataFrame:
             if len(parts) < 10:
                 raise ValueError(f"Invalid CoNLL-U line: {line}")
 
+            pos = parts[3]
             deprel = parts[7]
             misc = parts[9]
 
@@ -61,6 +60,7 @@ def extract_bos_eos_punct_flags_from_ud(ud_file: str) -> pd.DataFrame:
                 "bos": bos,
                 "eos": 0,
                 "is_punct": is_punct,
+                "pos": pos,
             })
 
             last_idx = len(token_rows) - 1
@@ -70,28 +70,24 @@ def extract_bos_eos_punct_flags_from_ud(ud_file: str) -> pd.DataFrame:
     if prev_was_token and last_idx is not None:
         token_rows[last_idx]["eos"] = 1
 
-    df_tok = pd.DataFrame(token_rows, columns=["story", "zone", "bos", "eos", "is_punct"]).astype({
-        "story":"int32","zone":"int32","bos":"int8","eos":"int8","is_punct":"int8"
+    df_tok = pd.DataFrame(token_rows, columns=["story", "zone", "bos", "eos", "is_punct", "pos"]).astype({
+        "story":"int32","zone":"int32","bos":"int8","eos":"int8","is_punct":"int8","pos":"string"
     })
 
-    agg = df_tok.groupby(["story","zone"], as_index=False).agg(bos=("bos","max"), eos=("eos","max"), is_punct=("is_punct", lambda s: int((s > 0).any())))
+    agg = df_tok.groupby(["story", "zone"], as_index=False).agg(
+            bos=("bos", "max"), 
+            eos=("eos", "max"), 
+            is_punct=("is_punct", lambda s: int((s > 0).any())),
+            pos=("pos", lambda x: "_".join(x.astype(str)))
+        )
     agg[["bos","eos","is_punct"]] = agg[["bos","eos","is_punct"]].astype("int8")
     agg = agg.sort_values(["story","zone"]).reset_index(drop=True)
     agg["sent_id"] = agg.groupby("story")["bos"].cumsum().astype("int32")
 
-    def _assign_position(g):
-        pos = 0
-        out = []
-        for punct in g["is_punct"].tolist():
-            pos += 1
-            out.append(pos)
-        g["position"] = out
-        return g
-
-    agg = agg.groupby(["story","sent_id"], group_keys=False).apply(_assign_position)
+    agg["position"] = agg.groupby(["story", "sent_id"]).cumcount() + 1
     agg["position"] = agg["position"].astype("int32")
 
-    agg = agg[["story","zone","bos","eos","is_punct","position"]]
+    agg = agg[["story","zone","bos","eos","is_punct","position","pos"]]
     return agg
 
 
@@ -102,7 +98,8 @@ def calc_unisurp(input_path: str) -> pd.DataFrame:
     saved in an array of length |V| under data/the_pile_16k_unigrams.npy
     """
     tokenizer = AutoTokenizer.from_pretrained("EleutherAI/pythia-70m", revision="step143000")
-    counts = np.load("../data/the_pile_16k_unigrams.npy").squeeze()
+
+    counts = np.load("./data/the_pile_16k_unigrams.npy").squeeze()
     log_total_counts = np.log2(np.sum(counts))
 
     with open(input_path, "r") as f:
@@ -141,10 +138,9 @@ def calc_unisurp(input_path: str) -> pd.DataFrame:
     return df
 
 
-
-def main(input_path: str, output_path: str) -> None:
+def main(input_path: str, output_path: str, ud_path: str) -> None:
     df_unisurp = calc_unisurp(input_path)
-    df_position = extract_bos_eos_punct_flags_from_ud("../data/naturalstories/parses/ud/stories-aligned.conllx")
+    df_position = extract_bos_eos_punct_flags_from_ud(ud_path)
 
     common_cols = ["story", "zone"]
     assert len(df_unisurp) == len(df_position), f"{len(df_unisurp)} != {len(df_position)}"
@@ -155,6 +151,8 @@ def main(input_path: str, output_path: str) -> None:
 
 
 if __name__ == "__main__":
-    input_path = "../data/stories.txt"
-    output_path = "../data/baselines_ns.csv"
-    main(input_path, output_path)
+    input_path = "./data/stories.txt"
+    output_path = "./data/baselines_ns.csv"
+    ud_path = "./data/naturalstories/parses/ud/stories-aligned.conllx"
+
+    main(input_path, output_path, ud_path)
