@@ -4,11 +4,11 @@ library(tidyverse)
 library(data.table)
 library(stats)
 
-ns_surp_base <- "data/ns_surp"
-baseline_df <- read_csv("data/baselines_ns.csv", show_col_types = FALSE)
-rt_path <- 'data/naturalstories/naturalstories_RTS/processed_RTs.tsv'
+ns_surp_base <- "../data/ns_surp"
+baseline_df <- read_csv("../data/baselines_ns.csv", show_col_types = FALSE)
+rt_path <- '../natural_stories/processed_RTs.tsv'
 
-# create a new dataframe with delta log-likelihoods for both context lengths and their delta delta log-likelihood
+# return a new dataframe with delta log-likelihoods for both context lengths and their delta delta log-likelihood
 compare_two_contexts <- function(
     df,
     rt_path,
@@ -49,12 +49,10 @@ compare_two_contexts <- function(
     select(story, zone, all_of(spill_cols)) %>%
     rename_with(~ paste0(., '_so1'), .cols = all_of(spill_cols))
 
-  print(names(df_so1))
   df_so2 <- df %>%
     mutate(zone = zone + 2) %>%
     select(story, zone, all_of(spill_cols)) %>%
     rename_with(~ paste0(., '_so2'), .cols = all_of(spill_cols))
-  print(names(df_so2))
   
   df <- df %>%
     left_join(df_so1, by = c('story', 'zone')) %>%
