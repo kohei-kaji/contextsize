@@ -78,7 +78,6 @@ n_words <- nrow(baseline)
 message(sprintf("  Baseline: %d rows", n_words))
 
 message("Loading surprisal values...")
-loaded <- 0
 for (m in model_dirs) {
   mc <- gsub("[-.]", "_", m)
   for (ctx in contexts_per_model[[m]]) {
@@ -89,10 +88,8 @@ for (m in model_dirs) {
       next
     }
     baseline[[sprintf("%s_ctx%d", mc, ctx)]] <- vals
-    loaded <- loaded + 1
   }
 }
-message(sprintf("  Loaded %d surprisal columns.", loaded))
 
 message("Computing sanity checks (correlation with unigram surprisal)...")
 
@@ -322,6 +319,7 @@ rownames(results) <- NULL
 write.csv(results, "./result/ns_lm_dll.csv", row.names = FALSE)
 message("Results saved to ./result/ns_lm_dll.csv")
 
+results <- read.csv("./result/ns_lm_dll.csv")
 
 
 context_order <- sort(unique(results$context))
@@ -496,5 +494,22 @@ p7 <- ggplot(combined_long, aes(x = cor_with_unisurp, y = mean_dll, color = mode
   )
 ggsave("./result/fig/ns_lm_dll_vs_cor_unisurp.png", p7, width = 10, height = 10, dpi = 300)
 message("  Saved: ./result/fig/ns_lm_dll_vs_cor_unisurp.png")
+
+p8 <- ggplot(combined_long, aes(x = mean_surp, y = mean_dll, color = model)) +
+  geom_point(size = 1.5) +
+  geom_text(aes(label = context), color = "black", size = 1.8, vjust = -0.4) +
+  facet_grid(rows = vars(baseline_label), cols = vars(model), scales = "free") +
+  scale_x_continuous(name = "Mean surprisal (bits per word)") +
+  scale_color_manual(values = model_colors) +
+  ylab("Delta Log Likelihood (per word)") +
+  theme_bw() +
+  theme(
+    axis.text.x     = element_text(angle = 45, hjust = 1),
+    strip.text      = element_text(face = "bold", size = 8),
+    legend.position = "none"
+  )
+
+ggsave("./result/fig/ns_lm_dll_vs_mean_surp_per_model.png", p8, width = 16, height = 8, dpi = 300)
+message("  Saved: ./result/fig/ns_lm_dll_vs_mean_surp_per_model.png")
 
 message("All done!")
