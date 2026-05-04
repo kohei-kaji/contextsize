@@ -80,7 +80,7 @@ def calculate_coref_distances(file_path):
 if __name__ == "__main__":
     from pathlib import Path
 
-    folder = Path('/Users/Lin1/Desktop/contextsize/gpt2_coref_results')
+    folder = Path('../gpt2_coref_results')
 
     mean = []
     for file in folder.glob('*.conllu'):

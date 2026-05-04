@@ -50,9 +50,9 @@ if __name__ == "__main__":
     # Initialize the pipeline
     nlp = stanza.Pipeline('en', processors='tokenize,pos,lemma,depparse,coref')
     
-    with open('stories.txt', 'r', encoding='utf-8') as file:
+    with open('../data/stories.txt', 'r', encoding='utf-8') as file:
         for line_id, line in enumerate(file, start=1):
             text = line.strip()
             # Run the function
             line_doc = nlp(text)
-            save_gpt2_conllu_with_coref(line_doc, text, f"gpt2_coref_doc{line_id}.conllu")
+            save_gpt2_conllu_with_coref(line_doc, text, f"../gpt2_coref_results/gpt2_coref_doc{line_id}.conllu")
