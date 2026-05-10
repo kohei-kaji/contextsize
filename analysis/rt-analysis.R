@@ -186,7 +186,17 @@ load_rt <- list(
         group_by(story, zone) %>%
         summarise(mean_RT = mean(time, na.rm = TRUE), .groups = "drop"),
 
-    osfp = function()
+
+    osff = function()
+        read_csv("../data/OneStop/rts.csv", col_types = cols_only(article_batch = "c", article_id = "c", difficulty_level = "c", zone = "d", is_correct = "l", IA_FIRST_FIXATION_DURATION = "d"), na = c("", "NA", ".")) %>%
+        mutate(story = paste(article_batch, article_id, difficulty_level, sep = "-")) %>%
+        select(-article_batch, -article_id, -difficulty_level) %>%
+        filter(is_correct == TRUE) %>%
+        mutate(IA_FIRST_FIXATION_DURATION = replace_na(IA_FIRST_FIXATION_DURATION, 0)) %>%
+        group_by(story, zone) %>%
+        summarise(mean_RT = mean(IA_FIRST_FIXATION_DURATION, na.rm = TRUE), .groups = "drop"),
+
+    osgd = function()
         read_csv("../data/OneStop/rts.csv", col_types = cols_only(article_batch = "c", article_id = "c", difficulty_level = "c", zone = "d", is_correct = "l", IA_FIRST_RUN_DWELL_TIME = "d"), na = c("", "NA", ".")) %>%
         mutate(story = paste(article_batch, article_id, difficulty_level, sep = "-")) %>%
         select(-article_batch, -article_id, -difficulty_level) %>%
@@ -195,16 +205,7 @@ load_rt <- list(
         group_by(story, zone) %>%
         summarise(mean_RT = mean(IA_FIRST_RUN_DWELL_TIME, na.rm = TRUE), .groups = "drop"),
 
-    osgp = function()
-        read_csv("../data/OneStop/rts.csv", col_types = cols_only(article_batch = "c", article_id = "c", difficulty_level = "c", zone = "d", is_correct = "l", IA_REGRESSION_PATH_DURATION = "d"), na = c("", "NA", ".")) %>%
-        mutate(story = paste(article_batch, article_id, difficulty_level, sep = "-")) %>%
-        select(-article_batch, -article_id, -difficulty_level) %>%
-        filter(is_correct == TRUE) %>%
-        mutate(IA_REGRESSION_PATH_DURATION = replace_na(IA_REGRESSION_PATH_DURATION, 0)) %>%
-        group_by(story, zone) %>%
-        summarise(mean_RT = mean(IA_REGRESSION_PATH_DURATION, na.rm = TRUE), .groups = "drop"),
-
-    ost = function()
+    ostf = function()
         read_csv("../data/OneStop/rts.csv", col_types = cols_only(article_batch = "c", article_id = "c", difficulty_level = "c", zone = "d", is_correct = "l", IA_DWELL_TIME = "d"), na = c("", "NA", ".")) %>%
         mutate(story = paste(article_batch, article_id, difficulty_level, sep = "-")) %>%
         select(-article_batch, -article_id, -difficulty_level) %>%
@@ -213,19 +214,19 @@ load_rt <- list(
         group_by(story, zone) %>%
         summarise(mean_RT = mean(IA_DWELL_TIME, na.rm = TRUE), .groups = "drop"),
 
-    provofp = function()
+    provoff = function()
+        read_csv("../data/provo_corpus/Provo_Corpus-Eyetracking_Data.csv", col_types = cols_only(Participant_ID = "c", Text_ID = "d", Word_Number = "d", IA_FIRST_FIXATION_DURATION = "d")) %>%
+        rename(story = Text_ID, zone = Word_Number) %>%
+        group_by(story, zone) %>%
+        summarise(mean_RT = mean(IA_FIRST_FIXATION_DURATION, na.rm = TRUE), .groups = "drop"),
+
+    provogd = function()
         read_csv("../data/provo_corpus/Provo_Corpus-Eyetracking_Data.csv", col_types = cols_only(Participant_ID = "c", Text_ID = "d", Word_Number = "d", IA_FIRST_RUN_DWELL_TIME = "d")) %>%
         rename(story = Text_ID, zone = Word_Number) %>%
         group_by(story, zone) %>%
         summarise(mean_RT = mean(IA_FIRST_RUN_DWELL_TIME, na.rm = TRUE), .groups = "drop"),
 
-    provogp = function()
-        read_csv("../data/provo_corpus/Provo_Corpus-Eyetracking_Data.csv", col_types = cols_only(Participant_ID = "c", Text_ID = "d", Word_Number = "d", IA_REGRESSION_PATH_DURATION = "d")) %>%
-        rename(story = Text_ID, zone = Word_Number) %>%
-        group_by(story, zone) %>%
-        summarise(mean_RT = mean(IA_REGRESSION_PATH_DURATION, na.rm = TRUE), .groups = "drop"),
-
-    provot = function()
+    provotf = function()
         read_csv("../data/provo_corpus/Provo_Corpus-Eyetracking_Data.csv", col_types = cols_only(Participant_ID = "c", Text_ID = "d", Word_Number = "d", IA_DWELL_TIME = "d")) %>%
         rename(story = Text_ID, zone = Word_Number) %>%
         group_by(story, zone) %>%
@@ -236,12 +237,12 @@ ds_config <- list(
     ns_spr = list(corpus = "ns", has_pos = TRUE),
     ns_maze = list(corpus = "ns", has_pos = TRUE),
     brown = list(corpus = "brown", has_pos = FALSE),
-    osfp = list(corpus = "os", has_pos = TRUE),
-    osgp = list(corpus = "os", has_pos = TRUE),
-    ost = list(corpus = "os", has_pos = TRUE),
-    provofp = list(corpus = "provo", has_pos = FALSE),
-    provogp = list(corpus = "provo", has_pos = FALSE),
-    provot = list(corpus = "provo", has_pos = FALSE)
+    osff = list(corpus = "os", has_pos = TRUE),
+    osgd = list(corpus = "os", has_pos = TRUE),
+    ostf = list(corpus = "os", has_pos = TRUE),
+    provoff = list(corpus = "provo", has_pos = FALSE),
+    provogd = list(corpus = "provo", has_pos = FALSE),
+    provotf = list(corpus = "provo", has_pos = FALSE)
 )
 
 df_list <- lapply(names(ds_config), function(ds) {
@@ -375,12 +376,12 @@ ds_labels <- c(
     ns_spr  = "Natural Stories SPR",
     ns_maze = "Natural Stories A-Maze",
     brown   = "Brown SPR",
-    osfp    = "OneStop FPD",
-    osgp    = "OneStop GPD",
-    ost     = "OneStop TFD",
-    provofp = "Provo FPD",
-    provogp = "Provo GPD",
-    provot  = "Provo TFD"
+    osff    = "OneStop FF",
+    osgd    = "OneStop GD",
+    ostf    = "OneStop TF",
+    provoff = "Provo FF",
+    provogd = "Provo GD",
+    provotf = "Provo TF"
 )
 
 make_plot <- function(df) {
@@ -406,6 +407,6 @@ for (bl in names(p_files)) {
     sub <- plot_long %>%
         filter(baseline_label == bl) %>%
         mutate(dataset_label = factor(ds_labels[as.character(dataset)], levels = unname(ds_labels)))
-    ggsave(p_files[[bl]], make_plot(sub), width = 12, height = 6, dpi = 300)
+    ggsave(p_files[[bl]], make_plot(sub), width = 12.5, height = 6, dpi = 300)
     message(sprintf("Saved: %s", p_files[[bl]]))
 }
