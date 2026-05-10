@@ -1,0 +1,48 @@
+Dataset: ns
+count    1521.000000
+mean       82.493754
+std       153.133869
+min         1.000000
+25%        14.000000
+50%        30.000000
+75%        67.000000
+max      1069.000000
+Name: gap_distance, dtype: float64
+
+
+Dataset: brown
+count    1008.000000
+mean      101.052579
+std       156.740338
+min         1.000000
+25%        15.000000
+50%        37.000000
+75%       107.000000
+max       893.000000
+Name: gap_distance, dtype: float64
+
+
+Dataset: provo
+count    200.000000
+mean      21.375000
+std       13.735637
+min        1.000000
+25%       10.750000
+50%       19.000000
+75%       29.500000
+max       69.000000
+Name: gap_distance, dtype: float64
+
+
+Dataset: os
+count    4441.000000
+mean       69.808151
+std       105.306465
+min         1.000000
+25%        12.000000
+50%        29.000000
+75%        78.000000
+max      1068.000000
+Name: gap_distance, dtype: float64
+
+

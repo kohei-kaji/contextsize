@@ -80,10 +80,16 @@ def calculate_coref_distances(file_path):
 if __name__ == "__main__":
     from pathlib import Path
 
-    folder = Path('../gpt2_coref_results')
+    folder = Path("../gpt2_coref_results")
+    with open("../result/coref_distance_summary.txt", "w") as summary_file:
 
-    mean = []
-    for file in folder.glob('*.conllu'):
-        df = calculate_coref_distances(file)
-        mean.append(df['gap_distance'].mean())
-    print(sum(mean)/len(mean))
+        for dataset in ["ns", "brown", "provo", "os"]:
+            print(f"Dataset: {dataset}", file=summary_file)
+            folder_ = folder / dataset
+            all_dfs = []
+            for file in folder_.glob('*.conllu'):
+                df = calculate_coref_distances(file)
+                all_dfs.append(df)
+            combined_df = pd.concat(all_dfs, ignore_index=True)
+            print(combined_df["gap_distance"].describe(), file=summary_file)
+            print("\n", file=summary_file)
