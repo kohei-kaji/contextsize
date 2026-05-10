@@ -100,7 +100,7 @@ def setup_tokenizer_and_model(tokenizer, model):
     return tokenizer, model
 
 
-def pretokenize_documents(documents: list[str], tokenizer):
+def pretokenize_documents(documents: list[str], tokenizer, causal_analysis=False):
     """Tokenize all documents and build word-token alignment.
 
     Returns:
@@ -153,6 +153,48 @@ def pretokenize_documents(documents: list[str], tokenizer):
         total_words += len(words)
 
     return doc_token_ids, doc_word_spans, doc_words, total_tokens, total_words
+
+import glob, re
+
+def load_mask_coref_tokens(coref_dir: str, num_docs: int) -> list[set[int]]:
+    result = []
+    for doc_i in range(1, num_docs + 1):
+        path = os.path.join(coref_dir, f"gpt2_coref_doc{doc_i}.conllu")
+        coref_positions = set()
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                parts = line.split("\t")
+                token_idx = int(parts[0]) - 1  # convert 1-based → 0-based
+                if parts[4] != "_":            # col 5 = coref chain IDs
+                    coref_positions.add(token_idx)
+        result.append(coref_positions)
+    return result
+
+
+def build_per_token_windows_with_causal_mask(
+    doc_token_ids: list[list[int]],
+    window_size: int,
+    pad_token_id: int,
+    mask_coref_tokens: list[set[int]],
+):
+    """ masking out co-ref tokens in the context window, so that the model can only attend to non-coref tokens during inference. """
+    all_windows, all_attn_masks, all_targets, doc_offsets = build_per_token_windows(doc_token_ids, window_size, pad_token_id)
+
+    row = 0
+    for doc_i, tids in enumerate(doc_token_ids):
+        coref_tokens = mask_coref_tokens[doc_i]
+        for t in range(len(tids)):
+            win_start = max(0, t + 1 - window_size)
+            for local_i, doc_pos in enumerate(range(win_start, t)):
+                if doc_pos in coref_tokens:
+                    col = window_size - (t + 1 - win_start) + local_i
+                    all_attn_masks[row, col] = 0
+            row += 1
+
+    return all_windows, all_attn_masks, all_targets, doc_offsets
 
 
 def build_per_token_windows(
@@ -306,6 +348,29 @@ def compute_token_level_quantities(
             print(f"    [{end}/{N}] tokens processed", flush=True)
 
     return surprisals, space_lp_after
+
+
+def aggregate_sum_surprisal(
+    surprisals: np.ndarray,
+    doc_token_ids: list[list[int]],
+    doc_word_spans: list[list[tuple[int, int]]],
+    doc_offsets: list[int],
+) -> np.ndarray:
+    """Aggregate per-token surprisals into per-word surprisals by simple summation."""
+    total_words = sum(len(ws) for ws in doc_word_spans)
+    result = np.zeros(total_words, dtype=np.float64)
+
+    wi = 0
+    for doc_i, (tids, wspans) in enumerate(zip(doc_token_ids, doc_word_spans)):
+        if not tids:
+            continue
+        off = doc_offsets[doc_i]
+        for t_start, t_end in wspans:
+            result[wi] = surprisals[off + t_start: off + t_end].sum()
+            wi += 1
+
+    assert wi == total_words
+    return result
 
 
 def aggregate_wt_surprisal(

@@ -15,6 +15,7 @@ def save_gpt2_conllu_with_coref(doc, text, filename):
     # Flatten the doc words into a list for easier character matching
     # This assumes your 'doc' variable is from Stanza/spaCy
     all_words = [word for sent in doc.sentences for word in sent.words]
+    all_entities = [ent for sent in doc.sentences for ent in sent.ents]
 
     with open(filename, "w", encoding="utf-8") as f:
         
@@ -22,7 +23,8 @@ def save_gpt2_conllu_with_coref(doc, text, filename):
             # Skip special tokens like <|endoftext|> if present
             if start == end == 0 and i != 0: continue
 
-            id_string = "_" 
+            id_string = "_"
+            ner_type = "_"
             # 3. Find which Stanza word overlaps with this GPT-2 token's offsets
             for word in all_words:
                 # Check if the subword is within the character bounds of the original word
@@ -32,6 +34,12 @@ def save_gpt2_conllu_with_coref(doc, text, filename):
                     if word.coref_chains:
                         ids = [f"{c.chain.index}" for c in word.coref_chains]
                         id_string = "|".join([str(i) for i in ids])
+                        break
+
+            # 3b. Find which Stanza entity overlaps with this GPT-2 token's offsets
+            for ent in all_entities:
+                if ent.end_char == end or start < ent.start_char < end or ent.start_char <= end < ent.end_char:
+                    ner_type = ent.type
                     break
 
             # 4. Build the row
@@ -40,15 +48,16 @@ def save_gpt2_conllu_with_coref(doc, text, filename):
                 str(i + 1),
                 token,
                 clean_token,
-                upos, # UPOS
-                id_string, # coref_label
+                upos,       # UPOS
+                id_string,  # coref_label
+                ner_type,   # NER entity type
                 f"GPT2_ID={t_id}" # Combined MISC Column
             ]
             f.write("\t".join(row) + "\n")
 
 if __name__ == "__main__":
     # Initialize the pipeline
-    nlp = stanza.Pipeline('en', processors='tokenize,pos,lemma,depparse,coref')
+    nlp = stanza.Pipeline('en', processors='tokenize,pos, ner, lemma,depparse,coref')
     
     with open('../data/stories.txt', 'r', encoding='utf-8') as file:
         for line_id, line in enumerate(file, start=1):
