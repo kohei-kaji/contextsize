@@ -70,7 +70,7 @@ MODEL_REGISTRY = {
 }
 
 _MODEL_MAX_CTX_FALLBACK = {
-    "gpt2": 1024, "gpt2-medium": 1024, "gpt2-large": 1024, "gpt2-xl": 1024,
+    "gpt2": 1025, "gpt2-medium": 1025, "gpt2-large": 1025, "gpt2-xl": 1025,
     "gpt-neo-125m": 2048, "gpt-neo-1.3b": 2048, "gpt-neo-2.7b": 2048, "gpt-j-6b": 2048,
     "opt-125m": 2048, "opt-350m": 2048, "opt-1.3b": 2048, "opt-2.7b": 2048,
     "opt-6.7b": 2048, "opt-13b": 2048, "opt-30b": 2048, "opt-66b": 2048,
