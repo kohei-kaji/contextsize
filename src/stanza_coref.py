@@ -58,10 +58,33 @@ def save_gpt2_conllu_with_coref(doc, text, filename):
 if __name__ == "__main__":
     # Initialize the pipeline
     nlp = stanza.Pipeline('en', processors='tokenize,pos, ner, lemma,depparse,coref')
-    
-    with open('../data/stories.txt', 'r', encoding='utf-8') as file:
+
+    os.makedirs("../gpt2_coref_results", exist_ok=True)
+
+    os.makedirs("../gpt2_coref_results/ns", exist_ok=True)
+    with open("../data/stories.txt", "r", encoding="utf-8") as file:
         for line_id, line in enumerate(file, start=1):
             text = line.strip()
-            # Run the function
             line_doc = nlp(text)
-            save_gpt2_conllu_with_coref(line_doc, text, f"../gpt2_coref_results/gpt2_coref_doc{line_id}.conllu")
+            save_gpt2_conllu_with_coref(line_doc, text, f"../gpt2_coref_results/ns/gpt2_coref_doc{line_id}.conllu")
+
+    os.makedirs("../gpt2_coref_results/brown", exist_ok=True)
+    with open("../data/brown.txt", "r", encoding="utf-8") as file:
+        for line_id, line in enumerate(file, start=1):
+            text = line.strip()
+            line_doc = nlp(text)
+            save_gpt2_conllu_with_coref(line_doc, text, f"../gpt2_coref_results/brown/gpt2_coref_doc{line_id}.conllu")
+
+    os.makedirs("../gpt2_coref_results/provo", exist_ok=True)
+    with open("../data/provo.txt", "r", encoding="utf-8") as file:
+        for line_id, line in enumerate(file, start=1):
+            text = line.strip()
+            line_doc = nlp(text)
+            save_gpt2_conllu_with_coref(line_doc, text, f"../gpt2_coref_results/provo/gpt2_coref_doc{line_id}.conllu")
+
+    os.makedirs("../gpt2_coref_results/os", exist_ok=True)
+    with open("../data/onestop.txt", "r", encoding="utf-8") as file:
+        for line_id, line in enumerate(file, start=1):
+            text = line.strip()
+            line_doc = nlp(text)
+            save_gpt2_conllu_with_coref(line_doc, text, f"../gpt2_coref_results/os/gpt2_coref_doc{line_id}.conllu")
