@@ -34,6 +34,7 @@ Usage:
 """
 
 import argparse
+import csv
 import gc
 import os
 import time
@@ -45,6 +46,13 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 
 
 LN2 = np.log(2.0)
+
+DEFAULT_STORY0_PRONOUNS_TSV = os.path.join(
+    os.path.dirname(__file__), "story0_pronouns.tsv"
+)
+DEFAULT_ALL_STORY_PRONOUNS_TSV = os.path.join(
+    os.path.dirname(__file__), "all_story_pronouns.tsv"
+)
 
 
 MODEL_REGISTRY = {
@@ -233,6 +241,256 @@ def build_per_token_windows(
             # Left-pad: real tokens at end of window
             all_windows[row, window_size - win_len:] = torch.tensor(
                 win_tokens, dtype=torch.long
+            )
+            all_attn_masks[row, window_size - win_len:] = 1
+            all_targets[row] = tids[t]
+            row += 1
+
+        doc_offsets.append(row)
+
+    assert row == total
+    return all_windows, all_attn_masks, all_targets, doc_offsets
+
+
+def load_pronoun_replacements_by_story(
+    pronoun_tsv_path: str | None = None,
+) -> dict[int, list[str | None]]:
+    """Load per-token pronoun replacements grouped by zero-based story id.
+
+    The preferred TSV shape is the all-story format:
+
+        story, token_index, word_index, token, pronoun_replacement
+
+    The returned dictionary is keyed by the TSV's zero-based story id. Each
+    value is indexed by token position and contains a replacement pronoun, or
+    None when the TSV has "NA". Legacy single-story files without a story
+    column are treated as story 0.
+    """
+    if pronoun_tsv_path is None:
+        pronoun_tsv_path = DEFAULT_ALL_STORY_PRONOUNS_TSV
+
+    replacements_by_story: dict[int, list[str | None]] = {}
+    expected_token_index_by_story: dict[int, int] = {}
+
+    with open(pronoun_tsv_path, encoding="utf-8-sig", newline="") as f:
+        reader = csv.DictReader(f, delimiter="\t")
+        required = {"token_index", "pronoun_replacement"}
+        if reader.fieldnames is None or not required.issubset(reader.fieldnames):
+            raise ValueError(
+                f"{pronoun_tsv_path} must contain columns: {sorted(required)}"
+            )
+        has_story_column = "story" in reader.fieldnames
+
+        for row_number, row in enumerate(reader, start=2):
+            try:
+                story_id = int(row["story"]) if has_story_column else 0
+                token_index = int(row["token_index"])
+            except ValueError as exc:
+                raise ValueError(
+                    f"{pronoun_tsv_path} has invalid story/token_index at row "
+                    f"{row_number}."
+                ) from exc
+
+            expected_token_index = expected_token_index_by_story.setdefault(story_id, 0)
+            if token_index != expected_token_index:
+                raise ValueError(
+                    f"{pronoun_tsv_path} story {story_id} has "
+                    f"token_index={token_index} at row {row_number}; expected "
+                    f"{expected_token_index}."
+                )
+
+            replacement = row["pronoun_replacement"].strip()
+            replacements_by_story.setdefault(story_id, []).append(
+                None if replacement == "NA" else replacement
+            )
+            expected_token_index_by_story[story_id] = expected_token_index + 1
+
+    if not replacements_by_story:
+        raise ValueError(f"{pronoun_tsv_path} did not contain any pronoun rows.")
+
+    return replacements_by_story
+
+
+def validate_pronoun_token_counts(
+    story_ids: list[int],
+    documents: list[str],
+    tokenizer,
+    replacements_by_story: dict[int, list[str | None]] | None = None,
+    pronoun_tsv_path: str | None = None,
+) -> list[list[str | None]]:
+    """Validate selected documents against per-story pronoun replacement rows.
+
+    story_ids must line up with documents. The return value has the same order
+    as documents and can be passed directly to
+    build_per_token_windows_with_pronoun_replacements(...).
+    """
+    if len(story_ids) != len(documents):
+        raise ValueError(
+            "story_ids and documents must have the same length "
+            f"({len(story_ids)} != {len(documents)})."
+        )
+    if replacements_by_story is None:
+        replacements_by_story = load_pronoun_replacements_by_story(pronoun_tsv_path)
+    if pronoun_tsv_path is None:
+        pronoun_tsv_path = DEFAULT_ALL_STORY_PRONOUNS_TSV
+
+    doc_pronoun_replacements = []
+    for story_id, document in zip(story_ids, documents):
+        if story_id not in replacements_by_story:
+            raise ValueError(f"{pronoun_tsv_path} does not contain story {story_id}.")
+
+        token_ids = tokenizer(document.strip(), add_special_tokens=False)["input_ids"]
+        replacements = replacements_by_story[story_id]
+        if len(token_ids) != len(replacements):
+            raise ValueError(
+                f"Token count mismatch for story {story_id}: tokenizer produced "
+                f"{len(token_ids)} tokens, but {pronoun_tsv_path} contains "
+                f"{len(replacements)} token rows."
+            )
+        doc_pronoun_replacements.append(replacements)
+
+    return doc_pronoun_replacements
+
+
+def build_per_token_windows_with_pronoun_replacements(
+    doc_token_ids: list[list[int]],
+    window_size: int,
+    pad_token_id: int,
+    tokenizer,
+    doc_pronoun_replacements: list[list[str | None]],
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, list[int]]:
+    """Build windows while collapsing annotated token spans to pronouns.
+
+    This follows build_per_token_windows, except each window is first scanned
+    for full contiguous document spans with the same non-NA
+    pronoun_replacement. Each such span is replaced by a single occurrence of
+    that pronoun only when the complete span is inside the context portion of
+    the window, excluding the current target token.
+
+    doc_pronoun_replacements must have the same nested shape as doc_token_ids.
+    For all_story_pronouns.tsv, call validate_pronoun_token_counts(...) with the
+    selected story ids and documents, then pass the returned nested list here.
+    """
+    if len(doc_token_ids) != len(doc_pronoun_replacements):
+        raise ValueError(
+            "doc_token_ids and doc_pronoun_replacements must have the same "
+            f"number of documents ({len(doc_token_ids)} != "
+            f"{len(doc_pronoun_replacements)})."
+        )
+
+    for doc_i, (tids, replacements) in enumerate(
+        zip(doc_token_ids, doc_pronoun_replacements)
+    ):
+        if len(tids) != len(replacements):
+            raise ValueError(
+                f"Document {doc_i} has {len(tids)} tokens but "
+                f"{len(replacements)} pronoun replacement entries."
+            )
+
+    total = sum(len(tids) for tids in doc_token_ids)
+    all_windows = torch.full((total, window_size), pad_token_id, dtype=torch.long)
+    all_attn_masks = torch.zeros((total, window_size), dtype=torch.long)
+    all_targets = torch.zeros(total, dtype=torch.long)
+
+    doc_offsets = [0]
+    row = 0
+    pronoun_token_cache: dict[tuple[str, bool, bool], list[int]] = {}
+
+    def format_pronoun_for_position(pronoun: str, starts_sentence: bool) -> str:
+        if pronoun == "i":
+            return "I"
+        if starts_sentence:
+            return pronoun[:1].upper() + pronoun[1:]
+        return pronoun
+
+    def span_starts_sentence(tids: list[int], span_start: int) -> bool:
+        if span_start == 0:
+            return True
+
+        prefix_text = tokenizer.decode(tids[max(0, span_start - 16):span_start]).rstrip()
+        if not prefix_text:
+            return True
+
+        opening_marks = set("\"'“‘([{:")
+        while prefix_text and prefix_text[-1] in opening_marks:
+            prefix_text = prefix_text[:-1].rstrip()
+        if not prefix_text:
+            return True
+
+        return prefix_text[-1] in ".!?"
+
+    def pronoun_token_ids(
+        pronoun: str,
+        starts_sentence: bool,
+        at_doc_start: bool,
+    ) -> list[int]:
+        cache_key = (pronoun, starts_sentence, at_doc_start)
+        if cache_key not in pronoun_token_cache:
+            formatted_pronoun = format_pronoun_for_position(pronoun, starts_sentence)
+            text = formatted_pronoun if at_doc_start else " " + formatted_pronoun
+            token_ids = tokenizer(text, add_special_tokens=False)["input_ids"]
+            if not token_ids:
+                raise ValueError(f"Replacement pronoun {pronoun!r} produced no tokens.")
+            pronoun_token_cache[cache_key] = token_ids
+        return pronoun_token_cache[cache_key]
+
+    for tids, replacements in zip(doc_token_ids, doc_pronoun_replacements):
+        L = len(tids)
+        replacement_spans: dict[int, tuple[int, int, str]] = {}
+        doc_pos = 0
+        while doc_pos < L:
+            replacement = replacements[doc_pos]
+            if replacement is None:
+                doc_pos += 1
+                continue
+
+            span_start = doc_pos
+            span_end = doc_pos + 1
+            while span_end < L and replacements[span_end] == replacement:
+                span_end += 1
+
+            for span_pos in range(span_start, span_end):
+                replacement_spans[span_pos] = (span_start, span_end, replacement)
+            doc_pos = span_end
+
+        for t in range(L):
+            win_start = max(0, t + 1 - window_size)
+            collapsed_tokens: list[int] = []
+            doc_pos = win_start
+
+            while doc_pos <= t:
+                span = replacement_spans.get(doc_pos)
+                if span is None:
+                    collapsed_tokens.append(tids[doc_pos])
+                    doc_pos += 1
+                    continue
+
+                span_start, span_end, replacement = span
+                collapse_span = (
+                    doc_pos == span_start
+                    and win_start <= span_start
+                    and span_end <= t
+                )
+
+                if collapse_span:
+                    collapsed_tokens.extend(
+                        pronoun_token_ids(
+                            replacement,
+                            starts_sentence=span_starts_sentence(tids, span_start),
+                            at_doc_start=(span_start == 0),
+                        )
+                    )
+                    doc_pos = span_end
+                else:
+                    collapsed_tokens.append(tids[doc_pos])
+                    doc_pos += 1
+
+            if len(collapsed_tokens) > window_size:
+                collapsed_tokens = collapsed_tokens[-window_size:]
+
+            win_len = len(collapsed_tokens)
+            all_windows[row, window_size - win_len:] = torch.tensor(
+                collapsed_tokens, dtype=torch.long
             )
             all_attn_masks[row, window_size - win_len:] = 1
             all_targets[row] = tids[t]
