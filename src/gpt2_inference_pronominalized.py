@@ -14,6 +14,7 @@ Usage:
     python src/gpt2_inference_pronominalized.py
     python src/gpt2_inference_pronominalized.py --story_ids 0 1 2
     python src/gpt2_inference_pronominalized.py --context_sizes 3 10 50 100
+    python src/gpt2_inference_pronominalized.py --pronoun_context_mode additional_context
 """
 
 import argparse
@@ -35,6 +36,7 @@ from word_surprisal import (
     get_space_token_ids,
     load_pronoun_replacements_by_story,
     pretokenize_documents,
+    pronoun_replacements_with_same_context,
     setup_tokenizer_and_model,
     validate_pronoun_token_counts,
 )
@@ -81,6 +83,18 @@ def main() -> None:
     parser.add_argument("--context_sizes", type=int, nargs="+")
     parser.add_argument("--device")
     parser.add_argument("--max_batch_tokens", type=int, default=1024)
+    parser.add_argument(
+        "--pronoun_context_mode",
+        choices=("window_only", "additional_context"),
+        default="window_only",
+        help=(
+            "How to build pronoun-aware windows. window_only collapses full "
+            "pronoun spans inside the original context window. "
+            "additional_context backfills earlier tokens after collapsing so "
+            "the realized window stays at the requested context size when "
+            "possible."
+        ),
+    )
     parser.add_argument(
         "--pronoun_tsv",
         default=DEFAULT_ALL_STORY_PRONOUNS_TSV,
@@ -175,6 +189,11 @@ def main() -> None:
     pad_id = tokenizer.pad_token_id
     space_ids = get_space_token_ids(tokenizer)
     use_position_ids = getattr(model.config, "model_type", "").lower() != "opt"
+    if args.pronoun_context_mode == "additional_context":
+        build_pronoun_windows = pronoun_replacements_with_same_context
+    else:
+        build_pronoun_windows = build_per_token_windows_with_pronoun_replacements
+    print(f"Pronoun context mode: {args.pronoun_context_mode}")
 
     for ctx_size in context_sizes:
         print(f"\n{'=' * 60}")
@@ -182,7 +201,7 @@ def main() -> None:
         print(f"{'=' * 60}")
         t0 = time.time()
 
-        all_win, all_mask, all_tgt, doc_off = build_per_token_windows_with_pronoun_replacements(
+        all_win, all_mask, all_tgt, doc_off = build_pronoun_windows(
             doc_tids,
             ctx_size,
             pad_id,
