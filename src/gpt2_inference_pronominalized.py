@@ -26,7 +26,7 @@ import numpy as np
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-sys.path.insert(0, os.path.dirname(__file__))
+
 from word_surprisal import (
     DEFAULT_ALL_STORY_PRONOUNS_TSV,
     aggregate_wt_surprisal,
@@ -39,28 +39,6 @@ from word_surprisal import (
     validate_pronoun_token_counts,
 )
 
-
-ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-DEFAULT_CONTEXT_SIZES = [1, 2, 3, 4, 5, 6]
-
-
-def choose_device() -> torch.device:
-    if torch.cuda.is_available():
-        return torch.device("cuda:0")
-    if torch.backends.mps.is_available():
-        return torch.device("mps")
-    return torch.device("cpu")
-
-
-def choose_dtype(device: torch.device, requested: str) -> torch.dtype:
-    if requested == "auto":
-        return torch.float32 if device.type in {"mps", "cpu"} else torch.float16
-    dtype_map = {
-        "float16": torch.float16,
-        "bfloat16": torch.bfloat16,
-        "float32": torch.float32,
-    }
-    return dtype_map[requested]
 
 
 def load_all_stories(path: str) -> list[str]:
@@ -77,14 +55,9 @@ def write_word_info(path: str, story_ids, doc_wspans, doc_words) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="GPT-2 word surprisal inference for original stories with pronoun-aware windows"
-    )
+    parser = argparse.ArgumentParser(description="GPT-2 word surprisal inference for original stories with pronoun-aware windows")
     parser.add_argument("--model_name", default="gpt2")
-    parser.add_argument(
-        "--input_file",
-        default=os.path.join(ROOT, "data", "stories.txt"),
-    )
+    parser.add_argument("--input_file", required=True)
     parser.add_argument(
         "--story_ids",
         type=int,
@@ -104,22 +77,10 @@ def main() -> None:
             "If omitted, all pronoun TSV stories are run."
         ),
     )
-    parser.add_argument(
-        "--output_dir",
-        default=os.path.join(ROOT, "data", "ns_surp", "gpt2_pronoun_test"),
-    )
-    parser.add_argument("--context_sizes", type=int, nargs="+", default=DEFAULT_CONTEXT_SIZES)
-    parser.add_argument(
-        "--max_batch_tokens",
-        type=int,
-        default=None,
-        help="Max tokens per batch. Defaults to 4096 on MPS, 65536 elsewhere.",
-    )
-    parser.add_argument(
-        "--dtype",
-        choices=["auto", "float16", "bfloat16", "float32"],
-        default="auto",
-    )
+    parser.add_argument("--output_dir", required=True)
+    parser.add_argument("--context_sizes", type=int, nargs="+")
+    parser.add_argument("--device")
+    parser.add_argument("--max_batch_tokens", type=int, default=1024)
     parser.add_argument(
         "--pronoun_tsv",
         default=DEFAULT_ALL_STORY_PRONOUNS_TSV,
@@ -133,10 +94,8 @@ def main() -> None:
     if args.story_ids is not None and args.story_number is not None:
         raise ValueError("Use either --story_ids or --story_number, not both.")
 
-    device = choose_device()
-    dtype = choose_dtype(device, args.dtype)
-    if args.max_batch_tokens is None:
-        args.max_batch_tokens = 4096 if device.type == "mps" else 65536
+    device = torch.device(args.device)
+    dtype = torch.float16
 
     os.makedirs(args.output_dir, exist_ok=True)
     print(f"Device: {device}  dtype: {dtype}  max_batch_tokens: {args.max_batch_tokens}")
@@ -144,10 +103,7 @@ def main() -> None:
     print(f"Loading {args.model_name}...")
     tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=True)
     tokenizer.model_max_length = sys.maxsize
-    model = AutoModelForCausalLM.from_pretrained(
-        args.model_name,
-        dtype=dtype,
-    ).to(device)
+    model = AutoModelForCausalLM.from_pretrained(args.model_name, dtype=dtype).to(device)
     tokenizer, model = setup_tokenizer_and_model(tokenizer, model)
     model.eval()
 
