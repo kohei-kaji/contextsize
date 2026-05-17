@@ -46,6 +46,12 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 
 
 LN2 = np.log(2.0)
+TSV_OPTIONS = {
+    "delimiter": "\t",
+    "quoting": csv.QUOTE_NONE,
+    "quotechar": None,
+    "escapechar": "\\",
+}
 
 DEFAULT_STORY0_PRONOUNS_TSV = os.path.join(
     os.path.dirname(__file__), "story0_pronouns.tsv"
@@ -273,7 +279,7 @@ def load_pronoun_replacements_by_story(
     expected_token_index_by_story: dict[int, int] = {}
 
     with open(pronoun_tsv_path, encoding="utf-8-sig", newline="") as f:
-        reader = csv.DictReader(f, delimiter="\t")
+        reader = csv.DictReader(f, **TSV_OPTIONS)
         required = {"token_index", "pronoun_replacement"}
         if reader.fieldnames is None or not required.issubset(reader.fieldnames):
             raise ValueError(
