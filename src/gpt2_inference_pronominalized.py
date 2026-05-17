@@ -11,9 +11,9 @@ Output matches the existing surprisal format:
   context_N.txt
 
 Usage:
-    python src/gpt2_inference_pronominalized.py
-    python src/gpt2_inference_pronominalized.py --story_ids 0 1 2
-    python src/gpt2_inference_pronominalized.py --context_sizes 3 10 50 100
+    python src/gpt2_inference_pronominalized.py --corpus provo --context_sizes 3 10 50 100
+    python src/gpt2_inference_pronominalized.py --corpus all --context_sizes 3 10 50 100
+    python src/gpt2_inference_pronominalized.py --input_file data/provo.txt --pronoun_tsv deepseek_pronoun_results/pronouns_provo.tsv --output_dir data/surp/provo_pronominalized/gpt2 --context_sizes 3 10 50 100
     python src/gpt2_inference_pronominalized.py --pronoun_context_mode additional_context
 """
 
@@ -22,6 +22,7 @@ import gc
 import os
 import sys
 import time
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -42,6 +43,18 @@ from word_surprisal import (
 )
 
 
+ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_CORPORA = ("provo", "brown", "onestop")
+DEFAULT_CONTEXT_SIZES = [3, 5, 10, 20, 50, 100]
+
+
+def default_corpus_paths(corpus: str, model_name: str) -> tuple[str, str, str]:
+    return (
+        str(ROOT / "data" / f"{corpus}.txt"),
+        str(ROOT / "deepseek_pronoun_results" / f"pronouns_{corpus}.tsv"),
+        str(ROOT / "data" / "surp" / f"{corpus}_pronominalized" / model_name),
+    )
+
 
 def load_all_stories(path: str) -> list[str]:
     with open(path, encoding="utf-8") as f:
@@ -56,124 +69,67 @@ def write_word_info(path: str, story_ids, doc_wspans, doc_words) -> None:
                 f.write(f"{story_id}\t{word_i}\t{word}\t{tok_end - tok_start}\n")
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="GPT-2 word surprisal inference for original stories with pronoun-aware windows")
-    parser.add_argument("--model_name", default="gpt2")
-    parser.add_argument("--input_file", required=True)
-    parser.add_argument(
-        "--story_ids",
-        type=int,
-        nargs="+",
-        default=None,
-        help=(
-            "Zero-based story ids to run. Defaults to every story represented in "
-            "the pronoun TSV."
-        ),
-    )
-    parser.add_argument(
-        "--story_number",
-        type=int,
-        default=None,
-        help=(
-            "Backward-compatible 1-based single story selector. Prefer --story_ids. "
-            "If omitted, all pronoun TSV stories are run."
-        ),
-    )
-    parser.add_argument("--output_dir", required=True)
-    parser.add_argument("--context_sizes", type=int, nargs="+")
-    parser.add_argument("--device")
-    parser.add_argument("--max_batch_tokens", type=int, default=1024)
-    parser.add_argument(
-        "--pronoun_context_mode",
-        choices=("window_only", "additional_context"),
-        default="window_only",
-        help=(
-            "How to build pronoun-aware windows. window_only collapses full "
-            "pronoun spans inside the original context window. "
-            "additional_context backfills earlier tokens after collapsing so "
-            "the realized window stays at the requested context size when "
-            "possible."
-        ),
-    )
-    parser.add_argument(
-        "--pronoun_tsv",
-        default=DEFAULT_ALL_STORY_PRONOUNS_TSV,
-        help=(
-            "Per-token pronoun replacement TSV with story, token_index, and "
-            "pronoun_replacement columns. Defaults to src/all_story_pronouns.tsv."
-        ),
-    )
-    args = parser.parse_args()
-
-    if args.story_ids is not None and args.story_number is not None:
-        raise ValueError("Use either --story_ids or --story_number, not both.")
-
-    device = torch.device(args.device)
-    dtype = torch.float16
-
-    os.makedirs(args.output_dir, exist_ok=True)
-    print(f"Device: {device}  dtype: {dtype}  max_batch_tokens: {args.max_batch_tokens}")
-
-    print(f"Loading {args.model_name}...")
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=True)
-    tokenizer.model_max_length = sys.maxsize
-    model = AutoModelForCausalLM.from_pretrained(args.model_name, dtype=dtype).to(device)
-    tokenizer, model = setup_tokenizer_and_model(tokenizer, model)
-    model.eval()
-
-    # GPT-2 supports 1024 positions. Keep the script conservative if another
-    # compatible checkpoint is passed in.
-    max_ctx = int(getattr(model.config, "n_positions", 1024))
-    context_sizes = sorted({ctx for ctx in args.context_sizes if ctx <= max_ctx})
-    skipped = sorted({ctx for ctx in args.context_sizes if ctx > max_ctx})
-    if skipped:
-        print(f"Skipping context sizes > {max_ctx}: {skipped}")
-    print(f"Context sizes: {context_sizes}")
-
-    all_stories = load_all_stories(args.input_file)
-    replacements_by_story = load_pronoun_replacements_by_story(args.pronoun_tsv)
-
+def selected_story_ids(args, replacements_by_story: dict[int, list[str | None]]) -> list[int]:
     if args.story_ids is not None:
-        story_ids = args.story_ids
-    elif args.story_number is not None:
+        return args.story_ids
+    if args.story_number is not None:
         if args.story_number < 1:
             raise ValueError(
                 f"story_number must be 1-based and positive, got {args.story_number}."
             )
-        story_ids = [args.story_number - 1]
-    else:
-        story_ids = sorted(replacements_by_story)
+        return [args.story_number - 1]
+    return sorted(replacements_by_story)
+
+
+def run_inference_for_inputs(
+    *,
+    input_file: str,
+    pronoun_tsv: str,
+    output_dir: str,
+    args,
+    tokenizer,
+    model,
+    context_sizes: list[int],
+    device,
+    dtype,
+) -> None:
+    os.makedirs(output_dir, exist_ok=True)
+    print(f"\nInput: {input_file}")
+    print(f"Pronouns: {pronoun_tsv}")
+    print(f"Output: {output_dir}")
+    print(f"Device: {device}  dtype: {dtype}  max_batch_tokens: {args.max_batch_tokens}")
+
+    all_stories = load_all_stories(input_file)
+    replacements_by_story = load_pronoun_replacements_by_story(pronoun_tsv)
+    story_ids = selected_story_ids(args, replacements_by_story)
 
     missing_pronouns = [story_id for story_id in story_ids if story_id not in replacements_by_story]
     if missing_pronouns:
         raise ValueError(
-            f"Requested story ids missing from {args.pronoun_tsv}: {missing_pronouns}"
+            f"Requested story ids missing from {pronoun_tsv}: {missing_pronouns}"
         )
 
     missing_stories = [story_id for story_id in story_ids if story_id >= len(all_stories)]
     if missing_stories:
         raise ValueError(
-            f"Requested story ids missing from {args.input_file}: {missing_stories}. "
-            f"{args.input_file} has {len(all_stories)} non-empty stories."
+            f"Requested story ids missing from {input_file}: {missing_stories}. "
+            f"{input_file} has {len(all_stories)} non-empty stories."
         )
 
     documents = [all_stories[story_id] for story_id in story_ids]
-    print(
-        f"Loaded {len(documents)} original stories from {args.input_file}: "
-        f"{story_ids}"
-    )
+    print(f"Loaded {len(documents)} original stories from {input_file}: {story_ids}")
 
     doc_pronoun_replacements = validate_pronoun_token_counts(
         story_ids,
         documents,
         tokenizer,
         replacements_by_story,
-        args.pronoun_tsv,
+        pronoun_tsv,
     )
     total_pronoun_rows = sum(len(replacements_by_story[story_id]) for story_id in story_ids)
     print(
         f"Validated {total_pronoun_rows} token-level pronoun entries "
-        f"from {args.pronoun_tsv} against {len(story_ids)} stories"
+        f"from {pronoun_tsv} against {len(story_ids)} stories"
     )
 
     print("Pre-tokenizing...")
@@ -182,7 +138,7 @@ def main() -> None:
     )
     print(f"  {total_tokens} tokens, {total_words} words")
 
-    info_path = os.path.join(args.output_dir, "word_info.tsv")
+    info_path = os.path.join(output_dir, "word_info.tsv")
     write_word_info(info_path, story_ids, doc_wspans, doc_words)
     print(f"  -> {info_path}")
 
@@ -229,7 +185,7 @@ def main() -> None:
             doc_off,
         )
 
-        out_path = os.path.join(args.output_dir, f"context_{ctx_size}.txt")
+        out_path = os.path.join(output_dir, f"context_{ctx_size}.txt")
         np.savetxt(out_path, word_surps, fmt="%.8f")
         print(f"  -> {out_path}  ({total_words} words, {time.time() - t0:.1f}s)")
 
@@ -238,7 +194,123 @@ def main() -> None:
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
-    print(f"\nDone. Output: {args.output_dir}/")
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="GPT-2 word surprisal inference for original stories with pronoun-aware windows")
+    parser.add_argument("--model_name", default="gpt2")
+    parser.add_argument(
+        "--corpus",
+        choices=[*DEFAULT_CORPORA, "all"],
+        help=(
+            "Use built-in paths for data/<corpus>.txt, "
+            "deepseek_pronoun_results/pronouns_<corpus>.tsv, and "
+            "data/surp/<corpus>_pronominalized/<model_name>. Use 'all' for all three."
+        ),
+    )
+    parser.add_argument("--input_file")
+    parser.add_argument(
+        "--story_ids",
+        type=int,
+        nargs="+",
+        default=None,
+        help=(
+            "Zero-based story ids to run. Defaults to every story represented in "
+            "the pronoun TSV."
+        ),
+    )
+    parser.add_argument(
+        "--story_number",
+        type=int,
+        default=None,
+        help=(
+            "Backward-compatible 1-based single story selector. Prefer --story_ids. "
+            "If omitted, all pronoun TSV stories are run."
+        ),
+    )
+    parser.add_argument("--output_dir")
+    parser.add_argument("--context_sizes", type=int, nargs="+", default=DEFAULT_CONTEXT_SIZES)
+    parser.add_argument(
+        "--device",
+        default="cuda" if torch.cuda.is_available() else "cpu",
+    )
+    parser.add_argument("--max_batch_tokens", type=int, default=1024)
+    parser.add_argument(
+        "--pronoun_context_mode",
+        choices=("window_only", "additional_context"),
+        default="window_only",
+        help=(
+            "How to build pronoun-aware windows. window_only collapses full "
+            "pronoun spans inside the original context window. "
+            "additional_context backfills earlier tokens after collapsing so "
+            "the realized window stays at the requested context size when "
+            "possible."
+        ),
+    )
+    parser.add_argument(
+        "--pronoun_tsv",
+        default=None,
+        help=(
+            "Per-token pronoun replacement TSV with story, token_index, and "
+            "pronoun_replacement columns. Defaults to src/all_story_pronouns.tsv."
+        ),
+    )
+    args = parser.parse_args()
+
+    if args.story_ids is not None and args.story_number is not None:
+        raise ValueError("Use either --story_ids or --story_number, not both.")
+
+    if args.corpus is not None and any(
+        value is not None for value in (args.input_file, args.pronoun_tsv, args.output_dir)
+    ):
+        raise ValueError("Use either --corpus or explicit --input_file/--pronoun_tsv/--output_dir.")
+
+    if args.corpus is None:
+        if args.input_file is None or args.output_dir is None:
+            raise ValueError("--input_file and --output_dir are required unless --corpus is used.")
+        run_specs = [
+            (
+                args.input_file,
+                args.pronoun_tsv or DEFAULT_ALL_STORY_PRONOUNS_TSV,
+                args.output_dir,
+            )
+        ]
+    else:
+        corpora = DEFAULT_CORPORA if args.corpus == "all" else (args.corpus,)
+        run_specs = [default_corpus_paths(corpus, args.model_name) for corpus in corpora]
+
+    device = torch.device(args.device)
+    dtype = torch.float16
+
+    print(f"Loading {args.model_name}...")
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=True)
+    tokenizer.model_max_length = sys.maxsize
+    model = AutoModelForCausalLM.from_pretrained(args.model_name, dtype=dtype).to(device)
+    tokenizer, model = setup_tokenizer_and_model(tokenizer, model)
+    model.eval()
+
+    # GPT-2 supports 1024 positions. Keep the script conservative if another
+    # compatible checkpoint is passed in.
+    max_ctx = int(getattr(model.config, "n_positions", 1024))
+    context_sizes = sorted({ctx for ctx in args.context_sizes if ctx <= max_ctx})
+    skipped = sorted({ctx for ctx in args.context_sizes if ctx > max_ctx})
+    if skipped:
+        print(f"Skipping context sizes > {max_ctx}: {skipped}")
+    print(f"Context sizes: {context_sizes}")
+
+    for input_file, pronoun_tsv, output_dir in run_specs:
+        run_inference_for_inputs(
+            input_file=input_file,
+            pronoun_tsv=pronoun_tsv,
+            output_dir=output_dir,
+            args=args,
+            tokenizer=tokenizer,
+            model=model,
+            context_sizes=context_sizes,
+            device=device,
+            dtype=dtype,
+        )
+
+    print("\nDone.")
 
 
 if __name__ == "__main__":
