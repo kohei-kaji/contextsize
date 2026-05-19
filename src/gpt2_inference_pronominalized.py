@@ -13,6 +13,7 @@ Output matches the existing surprisal format:
 Usage:
     python src/gpt2_inference_pronominalized.py --corpus provo --context_sizes 3 10 50 100
     python src/gpt2_inference_pronominalized.py --corpus all --context_sizes 3 10 50 100
+    python src/gpt2_inference_pronominalized.py --results-dir deepseek_pronoun_baseline_results --corpus all --context_sizes 3 10 50 100
     python src/gpt2_inference_pronominalized.py --input_file data/provo.txt --pronoun_tsv deepseek_pronoun_results/pronouns_provo.tsv --output_dir data/surp/provo_pronominalized/gpt2 --context_sizes 3 10 50 100
     python src/gpt2_inference_pronominalized.py --pronoun_context_mode additional_context
 """
@@ -44,16 +45,58 @@ from word_surprisal import (
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_CORPORA = ("provo", "brown", "onestop")
+DEFAULT_RESULTS_DIR = ROOT / "deepseek_pronoun_results"
+SUPPORTED_CORPORA = ("provo", "brown", "onestop", "ns")
 DEFAULT_CONTEXT_SIZES = [3, 5, 10, 20, 50, 100]
 
 
-def default_corpus_paths(corpus: str, model_name: str) -> tuple[str, str, str]:
+def input_file_for_corpus(results_dir: Path, corpus: str) -> Path:
+    return results_dir / f"{corpus}.txt"
+
+
+def output_name_for_results_dir(results_dir: Path, corpus: str) -> str:
+    suffix = "_baseline_pronominalized" if results_dir.name == "deepseek_pronoun_baseline_results" else "_pronominalized"
+    return f"{corpus}{suffix}"
+
+
+def default_corpus_paths(results_dir: Path, corpus: str, model_name: str) -> tuple[str, str, str]:
+    input_file = input_file_for_corpus(results_dir, corpus)
+    pronoun_tsv = results_dir / f"pronouns_{corpus}.tsv"
+    missing = [path for path in (input_file, pronoun_tsv) if not path.exists()]
+    if missing:
+        missing_paths = ", ".join(str(path) for path in missing)
+        raise FileNotFoundError(f"Missing required corpus files for {corpus}: {missing_paths}")
+
     return (
-        str(ROOT / "data" / f"{corpus}.txt"),
-        str(ROOT / "deepseek_pronoun_results" / f"pronouns_{corpus}.tsv"),
-        str(ROOT / "data" / "surp" / f"{corpus}_pronominalized" / model_name),
+        str(input_file),
+        str(pronoun_tsv),
+        str(ROOT / "data" / "surp" / output_name_for_results_dir(results_dir, corpus) / model_name),
     )
+
+
+def corpora_for_mode(results_dir: Path, corpus_mode: str) -> tuple[str, ...]:
+    if corpus_mode != "all":
+        return (corpus_mode,)
+
+    corpora = []
+    for path in sorted(results_dir.glob("pronouns_*.tsv")):
+        corpus = path.stem.removeprefix("pronouns_")
+        if corpus in SUPPORTED_CORPORA:
+            corpora.append(corpus)
+    if not corpora:
+        raise FileNotFoundError(f"No pronouns_<corpus>.tsv files found in {results_dir}")
+    return tuple(corpora)
+
+
+def resolve_results_dir(path: Path) -> Path:
+    if path.exists() or path.is_absolute():
+        return path
+
+    root_relative = ROOT / path
+    if root_relative.exists():
+        return root_relative
+
+    return path
 
 
 def load_all_stories(path: str) -> list[str]:
@@ -199,12 +242,18 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="GPT-2 word surprisal inference for original stories with pronoun-aware windows")
     parser.add_argument("--model_name", default="gpt2")
     parser.add_argument(
+        "--results-dir",
+        type=Path,
+        default=DEFAULT_RESULTS_DIR,
+        help="directory containing pronouns_<corpus>.tsv files and optional corpus text files",
+    )
+    parser.add_argument(
         "--corpus",
-        choices=[*DEFAULT_CORPORA, "all"],
+        choices=[*SUPPORTED_CORPORA, "all"],
         help=(
-            "Use built-in paths for data/<corpus>.txt, "
-            "deepseek_pronoun_results/pronouns_<corpus>.tsv, and "
-            "data/surp/<corpus>_pronominalized/<model_name>. Use 'all' for all three."
+            "Use built-in paths for <results-dir>/pronouns_<corpus>.tsv and "
+            "data/surp/<corpus>_pronominalized/<model_name>. Use 'all' for every "
+            "corpus available in the results directory."
         ),
     )
     parser.add_argument("--input_file")
@@ -255,14 +304,15 @@ def main() -> None:
         ),
     )
     args = parser.parse_args()
+    args.results_dir = resolve_results_dir(args.results_dir)
 
     if args.story_ids is not None and args.story_number is not None:
         raise ValueError("Use either --story_ids or --story_number, not both.")
 
     if args.corpus is not None and any(
-        value is not None for value in (args.input_file, args.pronoun_tsv, args.output_dir)
+        value is not None for value in (args.input_file, args.pronoun_tsv)
     ):
-        raise ValueError("Use either --corpus or explicit --input_file/--pronoun_tsv/--output_dir.")
+        raise ValueError("Use either --corpus or explicit --input_file/--pronoun_tsv.")
 
     if args.corpus is None:
         if args.input_file is None or args.output_dir is None:
@@ -275,8 +325,16 @@ def main() -> None:
             )
         ]
     else:
-        corpora = DEFAULT_CORPORA if args.corpus == "all" else (args.corpus,)
-        run_specs = [default_corpus_paths(corpus, args.model_name) for corpus in corpora]
+        corpora = corpora_for_mode(args.results_dir, args.corpus)
+        if args.output_dir is not None and len(corpora) > 1:
+            raise ValueError("--output_dir can only be used with one --corpus at a time.")
+        run_specs = [
+            default_corpus_paths(args.results_dir, corpus, args.model_name)
+            for corpus in corpora
+        ]
+        if args.output_dir is not None:
+            input_file, pronoun_tsv, _ = run_specs[0]
+            run_specs = [(input_file, pronoun_tsv, args.output_dir)]
 
     device = torch.device(args.device)
     dtype = torch.float16
