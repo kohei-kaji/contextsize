@@ -1,2 +1,2 @@
-All that it has to work with are imperfect incoming electrical impulses announcing that things are happening .
-It is then their to rapidly interpret these signals as well as they can , and suggest how to react .
+All that it has to work with are imperfect incoming electrical impulses announcing that things are happening.
+It is then their to rapidly interpret these signals as well as they can, and suggest how to react.
