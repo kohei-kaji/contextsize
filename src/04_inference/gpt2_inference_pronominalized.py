@@ -12,11 +12,11 @@ Output matches the existing surprisal format:
   context_N.txt
 
 Usage:
-    python pipeline/04_inference/gpt2_inference_pronominalized.py --corpus provo --context_sizes 3 10 50 100
-    python pipeline/04_inference/gpt2_inference_pronominalized.py --corpus all --context_sizes 3 10 50 100
-    python pipeline/04_inference/gpt2_inference_pronominalized.py --annotations-dir outputs/conditions/singleton_baseline/token_annotations --corpus all --context_sizes 3 10 50 100
-    python pipeline/04_inference/gpt2_inference_pronominalized.py --input_file outputs/raw_texts/provo.txt --pronoun_tsv outputs/conditions/repeated_coref/token_annotations/provo.tsv --output_dir outputs/inference_results/repeated_coref/provo/gpt2 --context_sizes 3 10 50 100
-    python pipeline/04_inference/gpt2_inference_pronominalized.py --pronoun_context_mode additional_context
+    python src/04_inference/gpt2_inference_pronominalized.py --corpus provo --context_sizes 3 10 50 100
+    python src/04_inference/gpt2_inference_pronominalized.py --corpus all --context_sizes 3 10 50 100
+    python src/04_inference/gpt2_inference_pronominalized.py --annotations-dir outputs/conditions/singleton_baseline/token_annotations --corpus all --context_sizes 3 10 50 100
+    python src/04_inference/gpt2_inference_pronominalized.py --input_file outputs/raw_texts/provo.txt --pronoun_tsv outputs/conditions/repeated_coref/token_annotations/provo.tsv --output_dir outputs/inference_results/repeated_coref/provo/gpt2 --context_sizes 3 10 50 100
+    python src/04_inference/gpt2_inference_pronominalized.py --pronoun_context_mode additional_context
 """
 
 import argparse

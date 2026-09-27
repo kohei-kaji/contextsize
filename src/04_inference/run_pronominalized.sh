@@ -13,7 +13,7 @@ PRONOUN_CONTEXT_MODE="${PRONOUN_CONTEXT_MODE:-additional_context}"
 MAX_BATCH_TOKENS="${MAX_BATCH_TOKENS:-1024}"
 CONTEXT_SIZES="${CONTEXT_SIZES:-2 3}"
 
-"${PYTHON_BIN}" pipeline/04_inference/gpt2_inference_pronominalized.py \
+"${PYTHON_BIN}" src/04_inference/gpt2_inference_pronominalized.py \
   --model_name "${MODEL_NAME}" \
   --annotations-dir "${ANNOTATIONS_DIR}" \
   --corpus "${CORPUS}" \

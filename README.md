@@ -4,7 +4,7 @@ This repository contains the code for the EMNLP 2026 paper Using LMs to Model th
 
 
 This repository contains the data and code for the context-size and pronominalization experiments.
-Reusable inputs, annotations, and saved results are exposed under `outputs/`; executable stages are grouped under `pipeline/`.
+Reusable inputs, annotations, and saved results are exposed under `outputs/`; executable stages are grouped under `src/`.
 
 ## Data dependencies
 
@@ -35,10 +35,10 @@ singleton mentions. The checked-in mapping JSONLs provide deterministic replay;
 new DeepSeek requests are opt-in.
 
 ```shell
-pipeline/run_annotations.sh ns repeated data/ns_surp/gpt2/word_info.tsv
+src/run_annotations.sh ns repeated data/ns_surp/gpt2/word_info.tsv
 ```
 
-See [`pipeline/README.md`](pipeline/README.md) for stage-by-stage commands,
+See [`src/README.md`](src/README.md) for stage-by-stage commands,
 condition options, and inference usage.
 
 ## Reusable outputs

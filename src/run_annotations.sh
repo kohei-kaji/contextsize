@@ -39,7 +39,7 @@ WORD_OUTPUT="outputs/conditions/${CONDITION}/word_annotations/${CORPUS}.tsv"
 TOKEN_OUTPUT="outputs/conditions/${CONDITION}/token_annotations/${CORPUS}.tsv"
 OCCURRENCE_POLICY="${OCCURRENCE_POLICY:-${DEFAULT_OCCURRENCE_POLICY}}"
 
-uv run python pipeline/01_coreference/build_stanza_word_coref.py \
+uv run python src/01_coreference/build_stanza_word_coref.py \
   "${RAW_TEXT}" "${STANZA_DIR}" --corpus "${CORPUS}"
 
 if [[ "${QUERY_DEEPSEEK:-0}" == "1" ]]; then
@@ -49,17 +49,17 @@ else
   MAPPING_ACTION=(--reuse-mappings "${MAPPING_SOURCE}")
 fi
 
-uv run python pipeline/02_pronoun_mapping/pronominalize.py \
+uv run python src/02_pronoun_mapping/pronominalize.py \
   "${STANZA_DIR}" "${DOCUMENT_DIR}" \
   --corpus "${CORPUS}" --mode "${MODE}" "${MAPPING_ACTION[@]}"
 
-uv run python pipeline/03_token_alignment/add_pronoun_mappings_to_word_info.py \
+uv run python src/03_token_alignment/add_pronoun_mappings_to_word_info.py \
   --word-info "${WORD_INFO}" \
   --mappings "${DOCUMENT_DIR}" \
   --output "${WORD_OUTPUT}" \
   --occurrence-policy "${OCCURRENCE_POLICY}"
 
-uv run python pipeline/03_token_alignment/expand_word_info_pronouns.py \
+uv run python src/03_token_alignment/expand_word_info_pronouns.py \
   --word-info "${WORD_OUTPUT}" \
   --output "${TOKEN_OUTPUT}"
 

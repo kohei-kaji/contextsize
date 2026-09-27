@@ -18,7 +18,7 @@ Install the pinned Python environment with `uv sync`. Then run stages 1–3 for
 one corpus and condition with:
 
 ```shell
-pipeline/run_annotations.sh ns repeated data/ns_surp/gpt2/word_info.tsv
+src/run_annotations.sh ns repeated data/ns_surp/gpt2/word_info.tsv
 ```
 
 The runner reuses the checked-in mapping JSONLs by default, which makes the
@@ -34,7 +34,7 @@ duplicate phrases within a sentence are aligned.
 Run inference for a generated condition with:
 
 ```shell
-uv run python pipeline/04_inference/gpt2_inference_pronominalized.py \
+uv run python src/04_inference/gpt2_inference_pronominalized.py \
   --annotations-dir outputs/conditions/repeated_coref/token_annotations \
   --corpus ns \
   --model_name gpt2 \
