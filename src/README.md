@@ -1,7 +1,8 @@
 # Reproducible pipeline
 
 The pipeline has four stages. Each stage reads from the repository's
-`outputs/` interface and writes the artifact consumed by the next stage.
+`outputs/pre_inference/` interface and writes the artifact consumed by the
+next stage. Inference results are written to `outputs/surprisal/`.
 
 ```text
 01_coreference
@@ -26,8 +27,8 @@ annotation build deterministic. Set `QUERY_DEEPSEEK=1` to request new mappings
 instead; this requires `DEEPSEEK_API_KEY` in the environment or `local.env`.
 
 Supported condition modes are `repeated` and `singleton`. Outputs are written
-to `outputs/conditions/repeated_coref/` and
-`outputs/conditions/singleton_baseline/`, respectively. Set
+to `outputs/pre_inference/conditions/repeated_coref/` and
+`outputs/pre_inference/conditions/singleton_baseline/`, respectively. Set
 `OCCURRENCE_POLICY=first` or `OCCURRENCE_POLICY=last-unoccupied` to control how
 duplicate phrases within a sentence are aligned.
 
@@ -35,7 +36,7 @@ Run inference for a generated condition with:
 
 ```shell
 uv run python src/04_inference/gpt2_inference_pronominalized.py \
-  --annotations-dir outputs/conditions/repeated_coref/token_annotations \
+  --annotations-dir outputs/pre_inference/conditions/repeated_coref/token_annotations \
   --corpus ns \
   --model_name gpt2 \
   --context_sizes 2 3 5 10 20 50 100

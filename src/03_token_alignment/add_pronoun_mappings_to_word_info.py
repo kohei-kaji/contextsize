@@ -16,9 +16,9 @@ from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_MAPPINGS = PROJECT_ROOT / "outputs" / "conditions" / "repeated_coref" / "documents" / "ns"
+DEFAULT_MAPPINGS = PROJECT_ROOT / "outputs" / "pre_inference" / "conditions" / "repeated_coref" / "documents" / "ns"
 DEFAULT_WORD_INFO = PROJECT_ROOT / "data" / "ns_surp" / "gpt2" / "word_info.tsv"
-DEFAULT_OUTPUT = PROJECT_ROOT / "outputs" / "conditions" / "repeated_coref" / "word_annotations" / "ns.tsv"
+DEFAULT_OUTPUT = PROJECT_ROOT / "outputs" / "pre_inference" / "conditions" / "repeated_coref" / "word_annotations" / "ns.tsv"
 REPLACEMENT_COLUMN = "pronoun_replacement"
 EMPTY_VALUE = "NA"
 OPENING_PUNCTUATION = {"'", '"', "(", "[", "{", "“", "‘"}

@@ -23,8 +23,8 @@ from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_INPUT = PROJECT_ROOT / "outputs" / "conditions" / "repeated_coref" / "word_annotations" / "ns.tsv"
-DEFAULT_OUTPUT = PROJECT_ROOT / "outputs" / "conditions" / "repeated_coref" / "token_annotations" / "ns.tsv"
+DEFAULT_INPUT = PROJECT_ROOT / "outputs" / "pre_inference" / "conditions" / "repeated_coref" / "word_annotations" / "ns.tsv"
+DEFAULT_OUTPUT = PROJECT_ROOT / "outputs" / "pre_inference" / "conditions" / "repeated_coref" / "token_annotations" / "ns.tsv"
 
 REQUIRED_COLUMNS = {"story", "zone", "word", "num_tokens", "pronoun_replacement"}
 EMPTY_VALUE = "NA"

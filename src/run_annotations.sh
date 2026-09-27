@@ -32,11 +32,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${PROJECT_ROOT}"
 
-RAW_TEXT="outputs/raw_texts/${SOURCE_NAME}"
-STANZA_DIR="outputs/stanza_annotations"
-DOCUMENT_DIR="outputs/conditions/${CONDITION}/documents/${CORPUS}"
-WORD_OUTPUT="outputs/conditions/${CONDITION}/word_annotations/${CORPUS}.tsv"
-TOKEN_OUTPUT="outputs/conditions/${CONDITION}/token_annotations/${CORPUS}.tsv"
+PRE_INFERENCE_DIR="outputs/pre_inference"
+RAW_TEXT="${PRE_INFERENCE_DIR}/raw_texts/${SOURCE_NAME}"
+STANZA_DIR="${PRE_INFERENCE_DIR}/stanza_annotations"
+DOCUMENT_DIR="${PRE_INFERENCE_DIR}/conditions/${CONDITION}/documents/${CORPUS}"
+WORD_OUTPUT="${PRE_INFERENCE_DIR}/conditions/${CONDITION}/word_annotations/${CORPUS}.tsv"
+TOKEN_OUTPUT="${PRE_INFERENCE_DIR}/conditions/${CONDITION}/token_annotations/${CORPUS}.tsv"
 OCCURRENCE_POLICY="${OCCURRENCE_POLICY:-${DEFAULT_OCCURRENCE_POLICY}}"
 
 uv run python src/01_coreference/build_stanza_word_coref.py \

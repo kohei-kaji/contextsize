@@ -59,6 +59,7 @@ DEFAULT_ALL_STORY_PRONOUNS_TSV = os.path.normpath(
         "..",
         "..",
         "outputs",
+        "pre_inference",
         "conditions",
         "repeated_coref",
         "token_annotations",

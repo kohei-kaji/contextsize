@@ -5,7 +5,7 @@ pronoun TSV to collapse annotated context spans to pronouns.
 
 The input file is expected to contain one original story per line.
 By default, explicit-input mode uses the repeated-coreference Natural Stories
-token annotations under ``outputs/conditions``.
+token annotations under ``outputs/pre_inference/conditions``.
 
 Output matches the existing surprisal format:
   word_info.tsv
@@ -14,8 +14,8 @@ Output matches the existing surprisal format:
 Usage:
     python src/04_inference/gpt2_inference_pronominalized.py --corpus provo --context_sizes 3 10 50 100
     python src/04_inference/gpt2_inference_pronominalized.py --corpus all --context_sizes 3 10 50 100
-    python src/04_inference/gpt2_inference_pronominalized.py --annotations-dir outputs/conditions/singleton_baseline/token_annotations --corpus all --context_sizes 3 10 50 100
-    python src/04_inference/gpt2_inference_pronominalized.py --input_file outputs/raw_texts/provo.txt --pronoun_tsv outputs/conditions/repeated_coref/token_annotations/provo.tsv --output_dir outputs/inference_results/repeated_coref/provo/gpt2 --context_sizes 3 10 50 100
+    python src/04_inference/gpt2_inference_pronominalized.py --annotations-dir outputs/pre_inference/conditions/singleton_baseline/token_annotations --corpus all --context_sizes 3 10 50 100
+    python src/04_inference/gpt2_inference_pronominalized.py --input_file outputs/pre_inference/raw_texts/provo.txt --pronoun_tsv outputs/pre_inference/conditions/repeated_coref/token_annotations/provo.tsv --output_dir outputs/surprisal/repeated_coref/provo/gpt2 --context_sizes 3 10 50 100
     python src/04_inference/gpt2_inference_pronominalized.py --pronoun_context_mode additional_context
 """
 
@@ -46,14 +46,14 @@ from word_surprisal import (
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_ANNOTATIONS_DIR = PROJECT_ROOT / "outputs" / "conditions" / "repeated_coref" / "token_annotations"
+DEFAULT_ANNOTATIONS_DIR = PROJECT_ROOT / "outputs" / "pre_inference" / "conditions" / "repeated_coref" / "token_annotations"
 SUPPORTED_CORPORA = ("provo", "brown", "onestop", "ns")
 DEFAULT_CONTEXT_SIZES = [3, 5, 10, 20, 50, 100]
 
 
 def input_file_for_corpus(corpus: str) -> Path:
     source_name = "stories.txt" if corpus == "ns" else f"{corpus}.txt"
-    return PROJECT_ROOT / "outputs" / "raw_texts" / source_name
+    return PROJECT_ROOT / "outputs" / "pre_inference" / "raw_texts" / source_name
 
 
 def default_corpus_paths(annotations_dir: Path, corpus: str, model_name: str) -> tuple[str, str, str]:
@@ -70,7 +70,7 @@ def default_corpus_paths(annotations_dir: Path, corpus: str, model_name: str) ->
         str(
             PROJECT_ROOT
             / "outputs"
-            / "inference_results"
+            / "surprisal"
             / annotations_dir.parent.name
             / corpus
             / model_name
@@ -305,7 +305,7 @@ def main() -> None:
         help=(
             "Per-token pronoun replacement TSV with story, token_index, and "
             "pronoun_replacement columns. Defaults to "
-            "outputs/conditions/repeated_coref/token_annotations/ns.tsv."
+            "outputs/pre_inference/conditions/repeated_coref/token_annotations/ns.tsv."
         ),
     )
     args = parser.parse_args()
