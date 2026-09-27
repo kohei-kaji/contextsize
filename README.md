@@ -30,6 +30,8 @@ raw corpus text
 
 Checked-in pronoun mappings make annotation deterministic; new DeepSeek requests
 are opt-in. See [`src/README.md`](src/README.md) for commands and options.
+Comprehensibility validation is in
+[`comprehensibility_checks/`](comprehensibility_checks).
 
 ## Reusable outputs
 

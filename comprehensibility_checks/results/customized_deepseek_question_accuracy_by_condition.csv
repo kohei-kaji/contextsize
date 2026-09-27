@@ -1,0 +1,4 @@
+condition,n,correct,accuracy
+coref_destroyed,60,55,0.9166666666666666
+original,60,60,1.0
+singleton_destroyed,60,54,0.9

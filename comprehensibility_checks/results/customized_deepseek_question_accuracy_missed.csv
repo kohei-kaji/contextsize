@@ -1,0 +1,12 @@
+condition,story_index,question_index,question,generated_label,chosen_answer,correct_label,correct_answer
+coref_destroyed,5,2,What city were the boys taken to for new shoes and haircuts?,B,Tennessee,A,Florida
+coref_destroyed,6,3,What item did Abby retrieve to help search the tank for Mr. Sticky?,A,a flashlight,B,a magnifying glass
+coref_destroyed,6,6,What surprise addition did Abby and her mother find right next to Mr. Sticky?,B,a plastic treasure chest,A,another water snail
+coref_destroyed,7,4,In what position was Lucy scheduled to perform in the talent show?,B,last,A,first
+coref_destroyed,10,1,In what person did Dr. Georges Gilles de la Tourette first describe the disorder?,A,a ten-year-old English schoolboy,B,an eighty-six-year-old French noblewoman
+singleton_destroyed,1,2,At what time of day did the fearsome boar prefer to come out?,B,in the dead of night,A,in the middle of the day
+singleton_destroyed,2,5,What did Aqua use as horses while playing in the peaceful pond?,B,ducks,A,frogs
+singleton_destroyed,3,2,Where did the girl sit down to cover herself when she could not go home?,B,inside a wooden shed,A,in a corner behind the little bakery
+singleton_destroyed,5,3,What color did the bones in the boy's feet look through the x-ray machine at the shoe store?,B,blue,A,green
+singleton_destroyed,6,4,What did Abby briefly mistake for the water snail while searching?,A,a small pebble,B,a large speck of dust
+singleton_destroyed,10,2,What condition do parents often mistake sniffing tics for before a formal diagnosis?,A,a chronic sinus infection,B,seasonal allergies
