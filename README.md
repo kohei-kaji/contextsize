@@ -1,15 +1,18 @@
-# Context-size experiments
+# Contextsize
 
-This repository contains the data and code for the context-size and
-pronominalization experiments. Reusable inputs, annotations, and saved results
-are exposed under `outputs/`; executable stages are grouped under `pipeline/`.
+This repository contains the code for the EMNLP 2026 paper Using LMs to Model the Effects of Context and Coreference during Sentence Comprehension.
+
+
+This repository contains the data and code for the context-size and pronominalization experiments.
+Reusable inputs, annotations, and saved results are exposed under `outputs/`; executable stages are grouped under `pipeline/`.
 
 ## Data dependencies
 
-Natural Stories comes from the
-[Natural Stories repository](https://github.com/languageMIT/naturalstories).
-`the_pile_16k_unigrams.npy` comes from the
-[LLM surprisal data release](https://github.com/byungdoh/llm_surprisal/tree/eacl24/data).
+- [Natural Stories](https://github.com/languageMIT/naturalstories)
+- [Provo](https://osf.io/sjefs/overview)
+- [OneStop](https://osf.io/zn9sq/overview)
+- Brown
+- [`the_pile_16k_unigrams.npy`](https://github.com/byungdoh/llm_surprisal/tree/eacl24/data)
 
 ## Data creation pipeline (before inference)
 
@@ -85,15 +88,22 @@ artifact used by inference.
 - Historical masking used a Python `set` to break equal-length ties. The
   recovered implementation adds a deterministic position/text tie-breaker.
 
-## Original experiment commands
 
+## Statistical analyses and plots
 ```shell
-cd src
-uv run baseline_preds_ns.py
-source run.sh  # takes a few days
-```
+cd analysis
 
-```shell
-cd ..
-Rscript src/analysis_ns.R
+# main analysis and plot
+Rscript rt-analysis.R
+Rscript plot.R
+
+
+# follow-up analysis1: test the DLL increase
+Rscript bayes_dll.R
+
+# follow-up analysis2: POS-tag analysis
+Rscript pos_analysis.R
+
+# follow-up analysis3: DLL degradation analysis
+Rscript dll_degradation.R
 ```
