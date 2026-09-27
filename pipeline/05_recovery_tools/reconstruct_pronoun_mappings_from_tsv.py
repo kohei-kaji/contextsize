@@ -1,1 +1,0 @@
-../reconstruct_pronoun_mappings_from_tsv.py

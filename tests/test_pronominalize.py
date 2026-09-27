@@ -1,16 +1,16 @@
 import json
 import tempfile
 import unittest
+from importlib import import_module
 from pathlib import Path
 
-from pipeline.pronominalize import (
-    extract_mentions,
-    mask_and_prepare,
-    parse_stanza_word_conllu,
-    prepare_records,
-    select_mentions,
-    sentence_targets,
-)
+pronominalize = import_module("pipeline.02_pronoun_mapping.pronominalize")
+extract_mentions = pronominalize.extract_mentions
+mask_and_prepare = pronominalize.mask_and_prepare
+parse_stanza_word_conllu = pronominalize.parse_stanza_word_conllu
+prepare_records = pronominalize.prepare_records
+select_mentions = pronominalize.select_mentions
+sentence_targets = pronominalize.sentence_targets
 
 
 FIXTURE = """\
@@ -28,7 +28,7 @@ FIXTURE = """\
 """
 
 
-class PipelineRecoveryTests(unittest.TestCase):
+class PronominalizationTests(unittest.TestCase):
     def parse_fixture(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)

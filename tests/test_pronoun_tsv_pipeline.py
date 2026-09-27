@@ -1,7 +1,12 @@
 import unittest
+from importlib import import_module
 
-from pipeline.add_pronoun_mappings_to_word_info import annotate_story
-from pipeline.expand_word_info_pronouns import expanded_rows
+alignment = import_module(
+    "pipeline.03_token_alignment.add_pronoun_mappings_to_word_info"
+)
+expansion = import_module("pipeline.03_token_alignment.expand_word_info_pronouns")
+annotate_story = alignment.annotate_story
+expanded_rows = expansion.expanded_rows
 
 
 class PronounTsvPipelineTests(unittest.TestCase):

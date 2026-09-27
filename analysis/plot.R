@@ -305,7 +305,7 @@ for (mdl in model_order) {
 }
 
 # Mean surprisal distributions of Original, CorefDisrupted, and SingletonDisrupted
-surp_base <- "../data/surp"
+surp_base <- "../outputs/inference_results"
 
 type_dirs <- list(
     ns    = c(orig = "ns",    pron = "ns_pronominalized",      bl = "ns_baseline_pronominalized"),

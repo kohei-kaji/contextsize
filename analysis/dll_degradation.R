@@ -156,7 +156,7 @@ NO_SPILL      <- c("story", "zone", "word", "bos", "eos", "is_punct", "position"
 outcome  <- "mean_RT"
 n_folds  <- 10L
 mc       <- gsub("[-.]", "_", "gpt2")
-surp_base <- "../data/surp"
+surp_base <- "../outputs/inference_results"
 
 spill <- function(df) {
     cols  <- setdiff(names(df), NO_SPILL)

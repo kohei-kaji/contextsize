@@ -13,7 +13,7 @@ CS_SHORT      <- 2L
 CS_LONG       <- 1023L
 POS_MIN_N     <- 100L
 OUTCOME       <- "mean_RT"
-SURP_BASE     <- "../data/surp"
+SURP_BASE     <- "../outputs/inference_results"
 MC            <- "gpt2"
 
 STAGE <- c(1L, 2L)

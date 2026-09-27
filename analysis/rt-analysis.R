@@ -8,7 +8,7 @@ set.seed(12345)
 
 PROVO_MAX_CTX <- 100L
 
-surp_base    <- "../data/surp"
+surp_base    <- "../outputs/inference_results"
 ns_surp_base <- file.path(surp_base, "ns")
 
 ns_model_dirs <- list.dirs(ns_surp_base, recursive = FALSE, full.names = FALSE)
