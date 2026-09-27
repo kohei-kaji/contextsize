@@ -13,4 +13,4 @@ wheels/
 /data/naturalstories
 .Rhistory
 .DS_Store
-/tests/
+tests/
